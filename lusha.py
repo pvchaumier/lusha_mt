@@ -77,7 +77,7 @@ def lushalize(api_key, firstname, lastname, company=None, domain=None):
 
     # Query using the domain.
     if domain is not None:
-        response = query_lusha(firstname, lastname,
+        response = query_lusha(api_key, firstname, lastname,
                                domain=domain)
         res = parse_lusha_response(response)
         return res
@@ -101,6 +101,6 @@ if __name__ == '__main__':
     for idx, row in df.iterrows():
         res = lushalize(api_key, row['firstname'], row['lastname'], row['company'], row['domain'])
         if res is not None:
-            df.loc[idx, 'emails'] = res[0]
-            df.loc[idx, 'phones'] = res[1]
+            df.set_value(idx, 'emails', res[0])
+            df.set_value(idx, 'phones', res[1])
     df.to_csv('out.csv', index=False)
