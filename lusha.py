@@ -7,6 +7,31 @@ import pandas as pd
 import requests
 
 
+def append_cache(item, res, cache):
+    """
+    Add each retireved line to a CSV cache
+    """
+    print(res)
+    item.set_value('emails', res[0])
+    item.set_value('phones', res[1])
+    cache.loc[len(cache)] = item
+    cache.to_csv('cache.csv', sep=';', encoding='latin-1')
+
+def find_row(item, cache):
+    res = cache.loc[lambda df: df.firstname == item['firstname']]
+    res = res.loc[lambda df: df.lastname == item['lastname']]
+    res = res.loc[lambda df: df.company == item['company']]
+    return res
+
+def get_from_cache(item, cache):
+    print('Item found in cache')
+    res = find_row(item, cache)
+    return res.loc[0]['emails'], res.loc[0]['phones']
+
+def check_cache(item, cache):
+    res = find_row(item, cache)
+    return (len(res['phones']) or len(res['emails']))
+
 def query_lusha(api_key, firstname, lastname, company=None, domain=None):
     """Query the lusha API.
 
@@ -94,13 +119,23 @@ if __name__ == '__main__':
     api_key = args.key
     csv_path = args.csv
 
+    try:
+        cache = pd.read_csv('cache.csv', encoding='latin-1', sep=';')
+    except FileNotFoundError:
+        cache = pd.DataFrame(columns=['firstname', 'lastname', 'company', 'domain', 'emails', 'phones'])
+
     df = pd.read_csv(csv_path, encoding='latin-1', sep=';')
     df = df.where(pd.notnull(df), None)
     df['emails'] = None
     df['phones'] = None
     for idx, row in df.iterrows():
-        res = lushalize(api_key, row['firstname'], row['lastname'], row['company'], row['domain'])
+        if check_cache(row, cache):
+            res = get_from_cache(row, cache)
+        else:
+            res = lushalize(api_key, row['firstname'], row['lastname'], row['company'], row['domain'])
         if res is not None:
+            if not check_cache(row, cache):
+                append_cache(row, res, cache)
             df.set_value(idx, 'emails', res[0])
             df.set_value(idx, 'phones', res[1])
     df.to_csv('out.csv', index=False)
